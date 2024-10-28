@@ -1,9 +1,12 @@
 from ollama import Client
-from myqueue import ReverseQueue as qu 
+from .myqueue import ReverseQueue as qu 
+from .task_classes import *
 
 class LLM:
     def __init__(self, llm) -> None:
         self.llm = llm
+
+
 
 class OLLAMA_LLM(LLM):
     def __init__(self,host, port, buffer_size=20) -> None:
@@ -42,4 +45,13 @@ class OLLAMA_LLM(LLM):
         conv.reverse()
         response = self.llm.chat(model='llama3.2:1b', messages=conv)
         self.add_to_conversation(message,response["message"])
+        return response["message"]["content"]
+    
+
+    def prompt(self, txt):
+        m = [{
+                'role': 'user',
+                'content': TASK_PROMPT(txt)
+            }]
+        response = self.llm.chat(model='llama3.2:1b', messages=m)
         return response["message"]["content"]

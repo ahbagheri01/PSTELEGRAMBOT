@@ -2,9 +2,9 @@ import telebot
 from dotenv import load_dotenv
 import sys
 import os
-from LLM import OLLAMA_LLM
-from mydatabase import *
-from myqueue import ReverseQueue as qu 
+from utils.LLM import OLLAMA_LLM
+from utils.mydatabase import *
+from utils.myqueue import ReverseQueue as qu 
 # Initialize the Ollama client
 
 # Set up configuration using .env file
@@ -14,7 +14,7 @@ def set_configs(env_file):
         "BOT_TOKEN": os.getenv("BOT_TOKEN", "NONE"),
         "use_tts": os.getenv("USE_TTS", "false"),
         "SQL_USER": os.getenv("SQL_USER",""),
-        "SQL_PASS": os.getenv("SQL_PASS","")
+        "SQL_PASS": os.getenv("SQL_PASS","P)OStPcbJYuzP5Sb")
     }
 
 config = set_configs(sys.argv[1])
@@ -37,7 +37,23 @@ class PS:
 
     def chat(self, message):
         res = self.llm.chat(message)
+        m = res
+        if len(m) > 2048:
+            for x in range(0, len(m), 2048):
+                self.bot.reply_to(message, text=m[x:x+2048])
+        else:
+            self.bot.reply_to(message, text=m)
+    
+    def add_task(self, message):
+        text = message.text[9:]
+        print(text)
+        res = self.llm.prompt(text)
+        print(res)
         self.bot.reply_to(message, res)
+
+
+        
+
 
 # Initialize PS class
 ollama_client = OLLAMA_LLM(host="localhost", port="11434")
@@ -49,8 +65,10 @@ ps = PS(config, bot, ollama_client)
 # Define bot commands
 @bot.message_handler(commands=['start', 'help', 'add_task'])
 def send_welcome(message):
-    print(message.text)
-    bot.reply_to(message, "Welcome! I'm your bot. How can I assist you today?")
+    if message.text.startswith("/add_task"):
+        res = ps.add_task(message)        
+    else:
+        bot.reply_to(message, "Welcome! I'm your bot. How can I assist you today?")
 
 # Echo and pass all other messages to the LLM chat function
 @bot.message_handler(func=lambda msg: True)

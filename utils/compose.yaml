@@ -1,0 +1,32 @@
+version: '3.1'
+
+services:
+  asgard-mysql:
+    image: mysql:8.0.12
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: OuPfme45oAM6m6S8lqy4PQfxlYFlCnmPzyaloZ5Zw
+    networks:
+      - asgard
+    ports:
+      - 3306:3306
+    volumes:
+      - /opt/mysql:/var/lib/mysql
+
+  asgard-phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    ports:
+      - 9099:80
+    environment:
+      - PMA_HOST=asgard-mysql
+    networks:
+      - asgard
+        
+
+
+networks:
+  asgard:
+
+# volumes:
+#   /opt/mysql:
