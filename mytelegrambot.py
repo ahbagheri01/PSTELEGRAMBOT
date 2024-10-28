@@ -13,8 +13,8 @@ def set_configs(env_file):
     return {
         "BOT_TOKEN": os.getenv("BOT_TOKEN", "NONE"),
         "use_tts": os.getenv("USE_TTS", "false"),
-        "SQL_USER": os.getenv("SQL_USER",""),
-        "SQL_PASS": os.getenv("SQL_PASS","P)OStPcbJYuzP5Sb")
+        "SQL_USER": os.getenv("SQL_USER","psbot"),
+        "SQL_PASS": os.getenv("SQL_PASS","psbot2024@")
     }
 
 config = set_configs(sys.argv[1])
@@ -22,7 +22,8 @@ os.environ["BOT_TOKEN"] = config["BOT_TOKEN"]
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 bot = telebot.TeleBot(BOT_TOKEN)
-db = DB(localhost = "localhost", usr = "psbot", pas = "psbot")
+db = DB(host = "localhost", user = config["SQL_USER"], password = config["SQL_PASS"], database = "psbot")
+db.create_tables()
 db.print_db()
 
 # Define the PS class for managing the bot and LLM interactions
@@ -31,6 +32,7 @@ class PS:
         self.config = config
         self.bot = bot
         self.llm = llm
+        self.user_id = {}
 
     def add_task(self, message):
         self.bot.reply_to(message, "Howdy, how are you doing?")
@@ -65,6 +67,8 @@ ps = PS(config, bot, ollama_client)
 # Define bot commands
 @bot.message_handler(commands=['start', 'help', 'add_task'])
 def send_welcome(message):
+    if not db.user_exists_by_telegram_id(message.from_user.id):
+        db.insert_user(message.from_user.username, message.from_user.id)
     if message.text.startswith("/add_task"):
         res = ps.add_task(message)        
     else:
@@ -73,6 +77,8 @@ def send_welcome(message):
 # Echo and pass all other messages to the LLM chat function
 @bot.message_handler(func=lambda msg: True)
 def echo_all(message):
+    if not db.user_exists_by_telegram_id(message.from_user.id):
+        db.insert_user(message.from_user.username, message.from_user.id)
     ps.chat(message)
 
 # Start the bot

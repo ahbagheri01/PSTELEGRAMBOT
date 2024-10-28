@@ -6,9 +6,9 @@ class DB:
     def __init__(self, **kwargs) -> None:
         try:
             self.mydb = mysql.connector.connect(
-                host=kwargs["host"],  # Make sure to pass host argument when initializing
-                user=kwargs["user"],  # MySQL username as `user`
-                password=kwargs["password"],  # MySQL password as `password`
+                host=kwargs["host"],  # Host for MySQL
+                user=kwargs["user"],  # MySQL username
+                password=kwargs["password"],  # MySQL password
                 database=kwargs.get("database")  # Optional: database name
             )
             if self.mydb.is_connected():
@@ -22,21 +22,23 @@ class DB:
     # 1. Create Tables
     def create_tables(self):
         cursor = self.mydb.cursor()
+        
+        # Create the users table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255),
-                user_telegram_id VARCHAR(255) UNIQUE
+                user_telegram_id VARCHAR(255) NOT NULL UNIQUE,
+                username VARCHAR(255)
             )
         ''')
 
+        # Create the tasks table with a foreign key to users
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tasks (
                 task_id INT AUTO_INCREMENT PRIMARY KEY,
                 task_name VARCHAR(255) NOT NULL,
                 description TEXT,
-                due_date DATE,
-                due_hour DATE,
+                due_date DATETIME,  -- Stores date and time
                 user_id INT,
                 FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
             )
@@ -45,23 +47,23 @@ class DB:
         print("Tables created successfully.")
 
     # 2. Insert Data
-    def insert_user(self, username):
+    def insert_user(self, username, user_telegram_id):
         cursor = self.mydb.cursor()
-        cursor.execute('INSERT INTO users (username) VALUES (%s)', (username,))
+        cursor.execute('INSERT INTO users (user_telegram_id, username) VALUES (%s, %s)', (user_telegram_id, username,))
         self.mydb.commit()
         print(f"User '{username}' inserted successfully.")
 
-    def insert_task(self, task_name, description, due_date, due_hour, user_id):
+    def insert_task(self, task_name, description, due_date, user_id):
         cursor = self.mydb.cursor()
         cursor.execute('''
-            INSERT INTO tasks (task_name, description, due_date, due_hour, user_id) 
-            VALUES (%s, %s, %s, %s, %s)
-        ''', (task_name, description, due_date, due_hour, user_id))
+            INSERT INTO tasks (task_name, description, due_date, user_id) 
+            VALUES (%s, %s, %s, %s)
+        ''', (task_name, description, due_date, user_id))
         self.mydb.commit()
         print(f"Task '{task_name}' inserted successfully.")
 
-    # 3. Update Data
-    def update_task(self, task_id, task_name=None, description=None, due_date=None, due_hour=None, user_id=None):
+    # 3. Update Task
+    def update_task(self, task_id, task_name=None, description=None, due_date=None, user_id=None):
         cursor = self.mydb.cursor()
         query = "UPDATE tasks SET "
         params = []
@@ -74,9 +76,6 @@ class DB:
         if due_date:
             query += "due_date = %s, "
             params.append(due_date)
-        if due_hour:
-            query += "due_hour = %s, "
-            params.append(due_hour)
         if user_id:
             query += "user_id = %s, "
             params.append(user_id)
@@ -100,28 +99,18 @@ class DB:
         self.mydb.commit()
         print(f"User with ID {user_id} deleted successfully.")
 
-    # Close connection
-    def close_connection(self):
-        if self.mydb.is_connected():
-            self.mydb.close()
-            print("Connection closed.")
-
-    # 5. Check Due Tasks
-    def check_due_tasks(self):
+    # 5. Check and Alarm for Due Tasks
+    def check_due_tasks(self, time_delta : timedelta = timedelta(hours=1)):
         cursor = self.mydb.cursor(dictionary=True)
         current_time = datetime.now()
-        one_hour_from_now = current_time + timedelta(days=2, hours=1)
-        print(current_time)
-        print(one_hour_from_now)
-
+        one_hour_from_now = current_time + time_delta
         cursor.execute('''
-            SELECT task_id, task_name, description, due_date, due_hour, user_id
+            SELECT task_id, task_name, description, due_date, user_id
             FROM tasks
-            WHERE due_date BETWEEN %s AND %s AND due_hour BETWEEN %s AND %s
-        ''', (current_time.day, one_hour_from_now.day, current_time.hour, one_hour_from_now.hour))
+            WHERE due_date BETWEEN %s AND %s
+        ''', (current_time, one_hour_from_now))
 
         due_tasks = cursor.fetchall()
-        print(due_tasks)
 
         if due_tasks:
             print("Tasks due within the next hour:")
@@ -130,21 +119,17 @@ class DB:
         else:
             print("No tasks are due within the next hour.")
 
+    # Close connection
+    def close_connection(self):
+        if self.mydb.is_connected():
+            self.mydb.close()
+            print("Connection closed.")
+
+    def user_exists_by_telegram_id(self, telegram_id):
+        cursor = self.mydb.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users WHERE username = %s', (telegram_id,))
+        result = cursor.fetchone()
+        return result[0] > 0
+
 # Example Usage
-db = DB(host="localhost", user="psbot", password="psbot2024@", database="psbot")
-db.print_db()
-db.create_tables()
-print("created tables")
-#db.insert_user("BOB")
-db.insert_task("Complete Report", "Finalize the quarterly report", "2024-10-29", "15-56-00" , 1)
 
-task_name = "Submit Project Proposal"
-description = "Prepare and submit the project proposal document"
-due_date = "2024-10-28 16:56:00"  # Due date in 'YYYY-MM-DD HH:MM:SS' format
-user_id = 1  # Replace with the actual user_id for JohnDoe
-
-# # # Insert task
-db.insert_task(task_name, description, due_date, user_id)
-db.check_due_tasks()
-
-db.close_connection()
